@@ -15,9 +15,22 @@ const {
 } = require("./middleware/authMiddleware");
 
 const app = express();
+const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
 app.use(cors());
 app.use(express.json());
+
+function getPythonCommand() {
+  const configuredPython = process.env.PYTHON;
+  const isWindowsPath = /^[A-Za-z]:[\\/]/.test(configuredPython || "");
+
+  // A Windows path copied into Render cannot run on its Linux host.
+  if (configuredPython && !(process.platform !== "win32" && isWindowsPath)) {
+    return configuredPython;
+  }
+
+  return process.platform === "win32" ? "python" : "python3";
+}
 
 function calculateWeatherRisk(condition) {
   const weather = condition.toLowerCase();
@@ -64,7 +77,7 @@ app.post("/api/predict", (req, res) => {
 
   const data = JSON.stringify(req.body);
 
-  const pythonCmd = process.env.PYTHON || "python";
+  const pythonCmd = getPythonCommand();
 
   let responded = false;
 
@@ -192,7 +205,10 @@ app.get("/api/incidents", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/location-risk/:location", authenticateToken, async (req, res) => {
+app.get(
+  "/api/location-risk/:location",
+  authenticateToken,
+  async (req, res) => {
   try {
     const location = req.params.location;
 
@@ -228,7 +244,8 @@ app.get("/api/location-risk/:location", authenticateToken, async (req, res) => {
       error: "Failed to calculate location risk",
     });
   }
-});
+  },
+);
 
 app.get("/api/weather", async (req, res) => {
   try {
@@ -398,28 +415,36 @@ app.get("/api/analytics", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({
+  const databaseConnected = mongoose.connection.readyState === 1;
+
+  res.status(databaseConnected ? 200 : 503).json({
     status: "OK",
     service: "AI TrafficShield Backend",
+    database: databaseConnected ? "connected" : "disconnected",
     time: new Date(),
   });
 });
 
 if (require.main === module) {
+  if (!mongoUri) {
+    console.error("MongoDB connection failed: MONGO_URI is not configured");
+    process.exit(1);
+  }
+
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(mongoUri)
     .then(() => {
       console.log("MongoDB connected successfully");
+      const PORT = process.env.PORT || 5000;
+
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on port ${PORT}`);
+      });
     })
     .catch((error) => {
       console.error("MongoDB connection failed:", error);
+      process.exit(1);
     });
-
-  const PORT = process.env.PORT || 5000;
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-  });
 }
 
 module.exports = app;
