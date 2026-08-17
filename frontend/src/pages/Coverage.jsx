@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-const locations = [
+const initialLocations = [
   { name: "Sitabuldi", risk: 87, currentOfficers: 1, requiredOfficers: 4 },
   { name: "Sadar", risk: 82, currentOfficers: 0, requiredOfficers: 3 },
   { name: "Hingna", risk: 71, currentOfficers: 2, requiredOfficers: 3 },
@@ -10,6 +10,7 @@ const locations = [
 
 function Coverage() {
   const [availableOfficers, setAvailableOfficers] = useState(5);
+  const [locations, setLocations] = useState(initialLocations);
   const [allocation, setAllocation] = useState([]);
   const [deploymentStatus, setDeploymentStatus] = useState("PENDING");
   const [modifiedAllocation, setModifiedAllocation] = useState({});
@@ -31,7 +32,7 @@ function Coverage() {
           (a, b) =>
             b.priorityScore - a.priorityScore || b.risk - a.risk,
         ),
-    [],
+    [locations],
   );
 
   const coverageGaps = priorityLocations.filter(
@@ -74,6 +75,43 @@ function Coverage() {
       [locationName]: Math.min(requested, maximumForLocation),
     }));
     setDeploymentStatus("MODIFIED");
+  };
+
+  const getAssignedOfficers = (location) =>
+    modifiedAllocation[location.name] ?? location.assigned;
+
+  const assignedOfficers = allocation.reduce(
+    (total, location) => total + getAssignedOfficers(location),
+    0,
+  );
+
+  const acceptRecommendation = () => {
+    if (!allocation.length || assignedOfficers === 0) return;
+
+    setLocations((currentLocations) =>
+      currentLocations.map((location) => {
+        const plan = allocation.find((item) => item.name === location.name);
+        return plan
+          ? {
+              ...location,
+              currentOfficers:
+                location.currentOfficers + getAssignedOfficers(plan),
+            }
+          : location;
+      }),
+    );
+    setAvailableOfficers((current) =>
+      Math.max(Number(current) - assignedOfficers, 0),
+    );
+    setAllocation([]);
+    setModifiedAllocation({});
+    setDeploymentStatus("ACCEPTED");
+  };
+
+  const rejectRecommendation = () => {
+    setAllocation([]);
+    setModifiedAllocation({});
+    setDeploymentStatus("REJECTED");
   };
 
   const unstaffed = coverageGaps.filter(
@@ -145,9 +183,20 @@ function Coverage() {
           </div>
         </div>
 
-        <button className="allocate-button" onClick={calculateAllocation}>
+        <button
+          className="allocate-button"
+          type="button"
+          onClick={calculateAllocation}
+        >
           🤖 Calculate Best Allocation
         </button>
+
+        {allocation.length > 0 && (
+          <p className="allocation-summary">
+            {assignedOfficers} of {Math.max(Number(availableOfficers) || 0, 0)}
+            {" "}available officers assigned.
+          </p>
+        )}
 
         {allocation.length > 0 && (
           <div className="allocation-results">
@@ -182,19 +231,23 @@ function Coverage() {
               <div className="decision-buttons">
                 <button
                   className="accept-button"
-                  onClick={() => setDeploymentStatus("ACCEPTED")}
+                  type="button"
+                  onClick={acceptRecommendation}
+                  disabled={assignedOfficers === 0}
                 >
                   ✓ Accept Recommendation
                 </button>
                 <button
                   className="modify-button"
+                  type="button"
                   onClick={() => setDeploymentStatus("MODIFIED")}
                 >
                   ✎ Modify Recommendation
                 </button>
                 <button
                   className="reject-button"
-                  onClick={() => setDeploymentStatus("REJECTED")}
+                  type="button"
+                  onClick={rejectRecommendation}
                 >
                   ✕ Reject Recommendation
                 </button>
@@ -225,6 +278,17 @@ function Coverage() {
         )}
       </section>
 
+      {deploymentStatus === "ACCEPTED" && (
+        <div className="success-message" role="status">
+          Deployment accepted and coverage levels have been updated.
+        </div>
+      )}
+      {deploymentStatus === "REJECTED" && (
+        <div className="danger-message" role="status">
+          Deployment plan rejected and cleared.
+        </div>
+      )}
+
       <section className="coverage-table-section">
         <h2>🚨 High-Priority Coverage Gaps</h2>
         <div className="coverage-table" role="table" aria-label="High-priority coverage gaps">
@@ -233,6 +297,7 @@ function Coverage() {
           </div>
           {priorityLocations.map((location, index) => {
             const isUnstaffed = location.currentOfficers === 0;
+            const isCovered = location.shortage === 0;
             return (
               <div className="coverage-row priority-row" role="row" key={location.name}>
                 <span><strong>#{index + 1} {location.name}</strong></span>
@@ -241,7 +306,15 @@ function Coverage() {
                 <span>{location.currentOfficers}</span>
                 <span>{location.requiredOfficers}</span>
                 <span className="shortage">+{location.shortage}</span>
-                <span><span className={`status-badge ${isUnstaffed ? "unstaffed" : "undercovered"}`}>{isUnstaffed ? "UNSTAFFED" : "UNDER-COVERED"}</span></span>
+                <span>
+                  <span
+                    className={`status-badge ${
+                      isCovered ? "covered" : isUnstaffed ? "unstaffed" : "undercovered"
+                    }`}
+                  >
+                    {isCovered ? "COVERED" : isUnstaffed ? "UNSTAFFED" : "UNDER-COVERED"}
+                  </span>
+                </span>
               </div>
             );
           })}
