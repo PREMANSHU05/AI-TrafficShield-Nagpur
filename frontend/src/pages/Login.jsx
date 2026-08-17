@@ -1,9 +1,10 @@
 import { useState } from "react";
 import axios from "../api";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -35,6 +36,12 @@ function Login() {
         <h1>🚦 AI-TrafficShield</h1>
         <p>Traffic Control System</p>
 
+        {location.state?.message && (
+          <p className="login-success" role="status">
+            {location.state.message}
+          </p>
+        )}
+
         <form onSubmit={handleLogin}>
           <label>Username</label>
           <input
@@ -58,6 +65,10 @@ function Login() {
 
           <button type="submit">Login</button>
         </form>
+
+        <p className="auth-link">
+          Need an account? <Link to="/register">Register</Link>
+        </p>
       </div>
     </div>
   );

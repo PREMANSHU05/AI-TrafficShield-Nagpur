@@ -654,6 +654,21 @@ a {
   margin-top: 15px;
 }
 
+.login-success {
+  color: #15803d;
+  margin: 0 0 15px;
+}
+
+.auth-link {
+  margin: 20px 0 0;
+  text-align: center;
+}
+
+.auth-link a {
+  color: #2563eb;
+  font-weight: 700;
+}
+
 .dashboard-header {
   display: flex;
   justify-content: space-between;
