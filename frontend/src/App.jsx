@@ -31,7 +31,7 @@ function Dashboard() {
 
         for (const location of trafficLocations) {
           const response = await axios.get(
-            `http://localhost:5000/api/location-risk/${encodeURIComponent(
+            `/api/location-risk/${encodeURIComponent(
               location.name,
             )}`,
             {
@@ -59,7 +59,7 @@ function Dashboard() {
     const fetchWeatherRisk = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/api/weather-risk",
+          "/api/weather-risk",
         );
         setWeatherRisk(response.data.weatherRisk);
         setWeatherCondition(response.data.condition);

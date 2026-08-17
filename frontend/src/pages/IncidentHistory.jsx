@@ -10,7 +10,7 @@ function IncidentHistory() {
     const token = localStorage.getItem("token");
 
     axios
-      .get("http://localhost:5000/api/incidents", {
+      .get("/api/incidents", {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((response) => {

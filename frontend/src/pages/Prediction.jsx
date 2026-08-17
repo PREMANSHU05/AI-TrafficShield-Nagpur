@@ -28,7 +28,7 @@ function Prediction() {
 
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/predict",
+        "/api/predict",
         form,
         {
           headers: {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "../api";
 import {
   LineChart,
   Line,
@@ -34,7 +34,7 @@ function Analytics() {
 
         // Fetch incidents
         const incidentRes = await axios.get(
-          "http://localhost:5000/api/incidents",
+          "/api/incidents",
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -64,7 +64,7 @@ function Analytics() {
         // Fetch location risk data
         const locationRiskPromises = trafficLocations.map((location) =>
           axios.get(
-            `http://localhost:5000/api/location-risk/${encodeURIComponent(
+            `/api/location-risk/${encodeURIComponent(
               location.name,
             )}`,
             {

@@ -50,7 +50,7 @@ function Deployment() {
           const baseRisk = calculateRisk(location);
 
           const response = await axios.get(
-            `http://localhost:5000/api/location-risk/${encodeURIComponent(
+            `/api/location-risk/${encodeURIComponent(
               location.name,
             )}`,
             {
