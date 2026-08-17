@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import axios from "../api";
 
 const initialLocations = [
   { name: "Sitabuldi", risk: 87, currentOfficers: 1, requiredOfficers: 4 },
@@ -14,6 +15,40 @@ function Coverage() {
   const [allocation, setAllocation] = useState([]);
   const [deploymentStatus, setDeploymentStatus] = useState("PENDING");
   const [modifiedAllocation, setModifiedAllocation] = useState({});
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCoverage = async () => {
+      try {
+        const response = await axios.get("/api/coverage");
+        const savedCoverage = response.data.coverage;
+
+        if (!active || !savedCoverage) return;
+
+        setLocations((currentLocations) =>
+          currentLocations.map((location) => {
+            const savedLocation = savedCoverage.locations.find(
+              (item) => item.name === location.name,
+            );
+            return savedLocation
+              ? { ...location, currentOfficers: savedLocation.currentOfficers }
+              : location;
+          }),
+        );
+        setAvailableOfficers(savedCoverage.availableOfficers);
+      } catch (error) {
+        console.error("Failed to load saved coverage:", error);
+      }
+    };
+
+    loadCoverage();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const priorityLocations = useMemo(
     () =>
@@ -85,27 +120,55 @@ function Coverage() {
     0,
   );
 
-  const acceptRecommendation = () => {
+  const acceptRecommendation = async () => {
     if (!allocation.length || assignedOfficers === 0) return;
 
-    setLocations((currentLocations) =>
-      currentLocations.map((location) => {
-        const plan = allocation.find((item) => item.name === location.name);
-        return plan
-          ? {
-              ...location,
-              currentOfficers:
-                location.currentOfficers + getAssignedOfficers(plan),
-            }
-          : location;
-      }),
+    const updatedLocations = locations.map((location) => {
+      const plan = allocation.find((item) => item.name === location.name);
+      return plan
+        ? {
+            ...location,
+            currentOfficers: location.currentOfficers + getAssignedOfficers(plan),
+          }
+        : location;
+    });
+    const remainingOfficers = Math.max(
+      Number(availableOfficers) - assignedOfficers,
+      0,
     );
-    setAvailableOfficers((current) =>
-      Math.max(Number(current) - assignedOfficers, 0),
-    );
-    setAllocation([]);
-    setModifiedAllocation({});
-    setDeploymentStatus("ACCEPTED");
+
+    try {
+      setSaving(true);
+      setSaveError("");
+      const response = await axios.put("/api/coverage", {
+        locations: updatedLocations.map(({ name, currentOfficers }) => ({
+          name,
+          currentOfficers,
+        })),
+        availableOfficers: remainingOfficers,
+      });
+      const savedCoverage = response.data.coverage;
+
+      setLocations((currentLocations) =>
+        currentLocations.map((location) => {
+          const savedLocation = savedCoverage.locations.find(
+            (item) => item.name === location.name,
+          );
+          return savedLocation
+            ? { ...location, currentOfficers: savedLocation.currentOfficers }
+            : location;
+        }),
+      );
+      setAvailableOfficers(savedCoverage.availableOfficers);
+      setAllocation([]);
+      setModifiedAllocation({});
+      setDeploymentStatus("ACCEPTED");
+    } catch (error) {
+      console.error("Failed to save coverage:", error);
+      setSaveError(error.response?.data?.error || "Unable to save deployment");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const rejectRecommendation = () => {
@@ -187,6 +250,7 @@ function Coverage() {
           className="allocate-button"
           type="button"
           onClick={calculateAllocation}
+          disabled={saving}
         >
           🤖 Calculate Best Allocation
         </button>
@@ -233,7 +297,7 @@ function Coverage() {
                   className="accept-button"
                   type="button"
                   onClick={acceptRecommendation}
-                  disabled={assignedOfficers === 0}
+                  disabled={assignedOfficers === 0 || saving}
                 >
                   ✓ Accept Recommendation
                 </button>
@@ -286,6 +350,11 @@ function Coverage() {
       {deploymentStatus === "REJECTED" && (
         <div className="danger-message" role="status">
           Deployment plan rejected and cleared.
+        </div>
+      )}
+      {saveError && (
+        <div className="danger-message" role="alert">
+          {saveError}
         </div>
       )}
 

@@ -9,6 +9,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Incident = require("./models/Incident");
 const User = require("./models/User");
+const CoverageState = require("./models/CoverageState");
 const {
   authenticateToken,
   requireRole,
@@ -411,6 +412,49 @@ app.get("/api/analytics", authenticateToken, async (req, res) => {
     res.status(500).json({
       error: "Unable to load analytics",
     });
+  }
+});
+
+app.get("/api/coverage", authenticateToken, async (req, res) => {
+  try {
+    const coverage = await CoverageState.findById("current").lean();
+    res.json({ coverage });
+  } catch (error) {
+    console.error("Coverage load error:", error);
+    res.status(500).json({ error: "Unable to load coverage data" });
+  }
+});
+
+app.put("/api/coverage", authenticateToken, async (req, res) => {
+  try {
+    const { locations, availableOfficers } = req.body;
+
+    if (!Array.isArray(locations) || !Number.isInteger(availableOfficers) || availableOfficers < 0) {
+      return res.status(400).json({ error: "Invalid coverage data" });
+    }
+
+    const validLocations = locations.every(
+      (location) =>
+        typeof location?.name === "string" &&
+        location.name.trim() &&
+        Number.isInteger(location.currentOfficers) &&
+        location.currentOfficers >= 0,
+    );
+
+    if (!validLocations) {
+      return res.status(400).json({ error: "Invalid location coverage data" });
+    }
+
+    const coverage = await CoverageState.findByIdAndUpdate(
+      "current",
+      { locations, availableOfficers },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+    );
+
+    res.json({ coverage });
+  } catch (error) {
+    console.error("Coverage update error:", error);
+    res.status(500).json({ error: "Unable to save coverage data" });
   }
 });
 
