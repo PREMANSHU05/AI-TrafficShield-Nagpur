@@ -4,6 +4,7 @@ const coverageLocationSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     currentOfficers: { type: Number, required: true, min: 0 },
+    requiredOfficers: { type: Number, required: true, min: 0 },
   },
   { _id: false },
 );

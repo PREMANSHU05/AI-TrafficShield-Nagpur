@@ -425,7 +425,11 @@ app.get("/api/coverage", authenticateToken, async (req, res) => {
   }
 });
 
-app.put("/api/coverage", authenticateToken, async (req, res) => {
+app.put(
+  "/api/coverage",
+  authenticateToken,
+  requireRole("admin"),
+  async (req, res) => {
   try {
     const { locations, availableOfficers } = req.body;
 
@@ -438,7 +442,9 @@ app.put("/api/coverage", authenticateToken, async (req, res) => {
         typeof location?.name === "string" &&
         location.name.trim() &&
         Number.isInteger(location.currentOfficers) &&
-        location.currentOfficers >= 0,
+        location.currentOfficers >= 0 &&
+        Number.isInteger(location.requiredOfficers) &&
+        location.requiredOfficers >= 0,
     );
 
     if (!validLocations) {
@@ -456,7 +462,8 @@ app.put("/api/coverage", authenticateToken, async (req, res) => {
     console.error("Coverage update error:", error);
     res.status(500).json({ error: "Unable to save coverage data" });
   }
-});
+  },
+);
 
 app.get("/api/health", (req, res) => {
   const databaseConnected = mongoose.connection.readyState === 1;

@@ -17,6 +17,13 @@ function Coverage() {
   const [modifiedAllocation, setModifiedAllocation] = useState({});
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
+  const isAdmin = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.role === "admin";
+    } catch {
+      return false;
+    }
+  })();
 
   useEffect(() => {
     let active = true;
@@ -34,7 +41,12 @@ function Coverage() {
               (item) => item.name === location.name,
             );
             return savedLocation
-              ? { ...location, currentOfficers: savedLocation.currentOfficers }
+              ? {
+                  ...location,
+                  currentOfficers: savedLocation.currentOfficers,
+                  requiredOfficers:
+                    savedLocation.requiredOfficers ?? location.requiredOfficers,
+                }
               : location;
           }),
         );
@@ -50,7 +62,7 @@ function Coverage() {
     };
   }, []);
 
-  const priorityLocations = useMemo(
+  const coverageLocations = useMemo(
     () =>
       locations
         .map((location) => {
@@ -62,12 +74,17 @@ function Coverage() {
 
           return { ...location, shortage, priorityScore };
         })
-        .filter((location) => location.risk >= 50)
         .sort(
           (a, b) =>
             b.priorityScore - a.priorityScore || b.risk - a.risk,
         ),
     [locations],
+  );
+
+  // The full list drives the coverage view; deployment stays focused on higher-risk areas.
+  const priorityLocations = useMemo(
+    () => coverageLocations.filter((location) => location.risk >= 50),
+    [coverageLocations],
   );
 
   const coverageGaps = priorityLocations.filter(
@@ -112,6 +129,16 @@ function Coverage() {
     setDeploymentStatus("MODIFIED");
   };
 
+  const updateOfficerCount = (locationName, field, value) => {
+    const officers = Math.max(Number(value) || 0, 0);
+    setLocations((currentLocations) =>
+      currentLocations.map((location) =>
+        location.name === locationName ? { ...location, [field]: officers } : location,
+      ),
+    );
+    setDeploymentStatus("MODIFIED");
+  };
+
   const getAssignedOfficers = (location) =>
     modifiedAllocation[location.name] ?? location.assigned;
 
@@ -141,9 +168,10 @@ function Coverage() {
       setSaving(true);
       setSaveError("");
       const response = await axios.put("/api/coverage", {
-        locations: updatedLocations.map(({ name, currentOfficers }) => ({
+        locations: updatedLocations.map(({ name, currentOfficers, requiredOfficers }) => ({
           name,
           currentOfficers,
+          requiredOfficers,
         })),
         availableOfficers: remainingOfficers,
       });
@@ -155,7 +183,11 @@ function Coverage() {
             (item) => item.name === location.name,
           );
           return savedLocation
-            ? { ...location, currentOfficers: savedLocation.currentOfficers }
+            ? {
+                ...location,
+                currentOfficers: savedLocation.currentOfficers,
+                requiredOfficers: savedLocation.requiredOfficers,
+              }
             : location;
         }),
       );
@@ -177,8 +209,52 @@ function Coverage() {
     setDeploymentStatus("REJECTED");
   };
 
-  const unstaffed = coverageGaps.filter(
+  const saveCoverageChanges = async () => {
+    try {
+      setSaving(true);
+      setSaveError("");
+      const response = await axios.put("/api/coverage", {
+        locations: locations.map(({ name, currentOfficers, requiredOfficers }) => ({
+          name,
+          currentOfficers,
+          requiredOfficers,
+        })),
+        availableOfficers: Math.max(Number(availableOfficers) || 0, 0),
+      });
+      const savedCoverage = response.data.coverage;
+
+      setLocations((currentLocations) =>
+        currentLocations.map((location) => {
+          const savedLocation = savedCoverage.locations.find(
+            (item) => item.name === location.name,
+          );
+          return savedLocation
+            ? {
+                ...location,
+                currentOfficers: savedLocation.currentOfficers,
+                requiredOfficers: savedLocation.requiredOfficers,
+              }
+            : location;
+        }),
+      );
+      setAvailableOfficers(savedCoverage.availableOfficers);
+      setDeploymentStatus("SAVED");
+    } catch (error) {
+      console.error("Failed to save coverage:", error);
+      setSaveError(error.response?.data?.error || "Unable to save coverage changes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const underCoveredLocations = coverageLocations.filter(
+    (location) => location.shortage > 0,
+  ).length;
+  const unstaffed = coverageLocations.filter(
     (location) => location.currentOfficers === 0,
+  ).length;
+  const coveredLocations = coverageLocations.filter(
+    (location) => location.shortage === 0,
   ).length;
   const priorityLocation = priorityLocations[0];
 
@@ -193,7 +269,8 @@ function Coverage() {
 
       <section className="coverage-stats" aria-label="Coverage summary">
         <div className="coverage-stat"><span>High-Risk</span><strong>{coverageGaps.length}</strong></div>
-        <div className="coverage-stat"><span>Under-Covered</span><strong>{coverageGaps.length}</strong></div>
+        <div className="coverage-stat"><span>Under-Covered</span><strong>{underCoveredLocations}</strong></div>
+        <div className="coverage-stat"><span>Covered</span><strong>{coveredLocations}</strong></div>
         <div className="coverage-stat"><span>Unstaffed</span><strong>{unstaffed}</strong></div>
       </section>
 
@@ -359,12 +436,13 @@ function Coverage() {
       )}
 
       <section className="coverage-table-section">
-        <h2>🚨 High-Priority Coverage Gaps</h2>
-        <div className="coverage-table" role="table" aria-label="High-priority coverage gaps">
+        <h2>🚨 Police Coverage Status</h2>
+        <p>All locations are shown, including covered and uncovered areas.</p>
+        <div className="coverage-table" role="table" aria-label="Police coverage status for all locations">
           <div className="coverage-row coverage-heading" role="row">
             <span>Location</span><span>Risk</span><span>Priority</span><span>Current</span><span>Required</span><span>Gap</span><span>Status</span>
           </div>
-          {priorityLocations.map((location, index) => {
+          {coverageLocations.map((location, index) => {
             const isUnstaffed = location.currentOfficers === 0;
             const isCovered = location.shortage === 0;
             return (
