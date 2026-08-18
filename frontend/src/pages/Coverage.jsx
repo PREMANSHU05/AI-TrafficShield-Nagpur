@@ -269,7 +269,7 @@ function Coverage() {
 
       <section className="coverage-stats" aria-label="Coverage summary">
         <div className="coverage-stat"><span>High-Risk</span><strong>{coverageGaps.length}</strong></div>
-        <div className="coverage-stat"><span>Under-Covered</span><strong>{underCoveredLocations}</strong></div>
+        <div className="coverage-stat"><span>Uncovered</span><strong>{underCoveredLocations}</strong></div>
         <div className="coverage-stat"><span>Covered</span><strong>{coveredLocations}</strong></div>
         <div className="coverage-stat"><span>Unstaffed</span><strong>{unstaffed}</strong></div>
       </section>
@@ -459,7 +459,7 @@ function Coverage() {
                       isCovered ? "covered" : isUnstaffed ? "unstaffed" : "undercovered"
                     }`}
                   >
-                    {isCovered ? "COVERED" : isUnstaffed ? "UNSTAFFED" : "UNDER-COVERED"}
+                    {isCovered ? "COVERED" : isUnstaffed ? "UNSTAFFED" : "UNCOVERED"}
                   </span>
                 </span>
               </div>
