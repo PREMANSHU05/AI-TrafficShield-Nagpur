@@ -256,7 +256,9 @@ function Coverage() {
   const coveredLocations = coverageLocations.filter(
     (location) => location.shortage === 0,
   ).length;
-  const priorityLocation = priorityLocations[0];
+  const priorityLocation = priorityLocations.find(
+    (location) => location.shortage > 0,
+  );
 
   return (
     <main className="coverage-page">
@@ -273,6 +275,52 @@ function Coverage() {
         <div className="coverage-stat"><span>Covered</span><strong>{coveredLocations}</strong></div>
         <div className="coverage-stat"><span>Unstaffed</span><strong>{unstaffed}</strong></div>
       </section>
+
+      {isAdmin && (
+        <section className="coverage-editor" aria-label="Edit police coverage">
+          <div>
+            <h2>Update Coverage Levels</h2>
+            <p>Set current officers below the required count to mark a location as uncovered.</p>
+          </div>
+          <div className="coverage-editor-list">
+            {coverageLocations.map((location) => (
+              <div className="coverage-editor-row" key={location.name}>
+                <strong>{location.name}</strong>
+                <label>
+                  Current
+                  <input
+                    type="number"
+                    min="0"
+                    value={location.currentOfficers}
+                    onChange={(event) =>
+                      updateOfficerCount(location.name, "currentOfficers", event.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Required
+                  <input
+                    type="number"
+                    min="0"
+                    value={location.requiredOfficers}
+                    onChange={(event) =>
+                      updateOfficerCount(location.name, "requiredOfficers", event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+          <button
+            className="save-coverage-button"
+            type="button"
+            onClick={saveCoverageChanges}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save Coverage Changes"}
+          </button>
+        </section>
+      )}
 
       <section className="priority-panel">
         <h2>🚨 Police Attention Priority</h2>
@@ -476,6 +524,15 @@ function Coverage() {
               <strong>{priorityLocation.name}</strong> requires immediate attention because its risk score is <strong>{priorityLocation.risk}/100</strong> while only <strong>{priorityLocation.currentOfficers} officer{priorityLocation.currentOfficers === 1 ? "" : "s"}</strong> {priorityLocation.currentOfficers === 1 ? "is" : "are"} deployed against <strong>{priorityLocation.requiredOfficers} required</strong>.
             </p>
             <p><strong>Recommended Action:</strong> Deploy {priorityLocation.shortage} additional officer{priorityLocation.shortage === 1 ? "" : "s"} to {priorityLocation.name}.</p>
+          </div>
+        </section>
+      )}
+      {!priorityLocation && (
+        <section className="ai-coverage-recommendation">
+          <h2>ðŸ¤– AI Coverage Recommendation</h2>
+          <div className="recommendation-box">
+            <p><strong>All priority locations are currently covered.</strong></p>
+            <p><strong>Recommended Action:</strong> No additional deployment is needed at this time. Continue monitoring risk levels and staffing changes.</p>
           </div>
         </section>
       )}
